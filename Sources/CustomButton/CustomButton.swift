@@ -282,6 +282,9 @@ open class CustomButton: NSButton {
                                         (imageLayer.frame.height * 0.5)
             imageMaskLayer.frame = imageLayer.bounds
         }
+        else {
+            imageLayer.isHidden = true
+        }
 	}
 
 	private func animateColor() {
