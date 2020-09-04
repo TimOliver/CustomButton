@@ -3,6 +3,8 @@ import Cocoa
 @IBDesignable
 open class CustomButton: NSButton {
 	private let titleLayer = CATextLayer()
+    private let imageLayer = CALayer()
+    private let imageMaskLayer = CALayer()
 	private var isMouseDown = false
 
 	public static func circularButton(title: String, radius: Double, center: CGPoint) -> CustomButton {
@@ -21,6 +23,12 @@ open class CustomButton: NSButton {
 			setTitle()
 		}
 	}
+
+    @IBInspectable override public var image: NSImage? {
+        didSet {
+            setImage()
+        }
+    }
 
 	@IBInspectable public var textColor: NSColor = .labelColor {
 		didSet {
@@ -126,6 +134,9 @@ open class CustomButton: NSButton {
 		}
 	}
 
+    @IBInspectable public var animationDuration: Double = 0.01
+    @IBInspectable public var activeAnimationDuration: Double = 0.2
+
 	override public var font: NSFont? {
 		didSet {
 			setTitle()
@@ -158,7 +169,7 @@ open class CustomButton: NSButton {
 
 	override open func layout() {
 		super.layout()
-		positionTitle()
+		positionContent()
 	}
 
 	override open func viewDidChangeBackingProperties() {
@@ -167,6 +178,8 @@ open class CustomButton: NSButton {
 		if let scale = window?.backingScaleFactor {
 			layer?.contentsScale = scale
 			titleLayer.contentsScale = scale
+            imageLayer.contentsScale = scale
+            imageMaskLayer.contents = image?.layerContents(forContentsScale: scale)
 		}
 	}
 
@@ -208,6 +221,12 @@ open class CustomButton: NSButton {
 		layer?.addSublayer(titleLayer)
 		setTitle()
 
+        imageLayer.contentsScale = window?.backingScaleFactor ?? 2
+        imageLayer.backgroundColor = isOn ? activeTextColor.cgColor : textColor.cgColor
+        imageLayer.mask = imageMaskLayer
+        layer?.addSublayer(imageLayer)
+        setImage()
+
 		needsDisplay = true
 	}
 
@@ -244,14 +263,30 @@ open class CustomButton: NSButton {
 		needsLayout = true
 	}
 
-	private func positionTitle() {
+    private func setImage() {
+        guard let image = image else { return }
+        imageMaskLayer.contents = image.layerContents(forContentsScale: window?.backingScaleFactor ?? 2)
+        needsLayout = true
+    }
+
+	private func positionContent() {
 		let titleSize = title.size(withAttributes: [.font: font as Any])
 		titleLayer.frame = titleSize.centered(in: bounds).roundedOrigin()
+
+        if let image = image {
+            titleLayer.frame.origin.x += ((image.size.width * 0.5) + 4)
+            imageLayer.frame.size = image.size
+            imageLayer.frame.origin.x = titleLayer.frame.minX -
+                                        (imageLayer.frame.width + 4)
+            imageLayer.frame.origin.y = bounds.midY -
+                                        (imageLayer.frame.height * 0.5)
+            imageMaskLayer.frame = imageLayer.bounds
+        }
 	}
 
 	private func animateColor() {
 		let isOn = state == .on
-		let duration = isOn ? 0.2 : 0.1
+        let duration = isOn ? animationDuration : activeAnimationDuration
 		let backgroundColor = isOn ? color(for: \.activeBackgroundColor) : color(for: \.backgroundColor)
 		let textColor = isOn ? color(for: \.activeTextColor) : color(for: \.textColor)
 		let borderColor = isOn ? color(for: \.activeBorderColor) : color(for: \.borderColor)
@@ -261,6 +296,7 @@ open class CustomButton: NSButton {
 		layer?.animate(\.borderColor, to: borderColor, duration: duration)
 		layer?.animate(\.shadowColor, to: shadowColor, duration: duration)
 		titleLayer.animate(\.foregroundColor, to: textColor, duration: duration)
+        imageLayer.animate(\.backgroundColor, to: textColor, duration: duration)
 	}
 
 	private func toggleState() {
